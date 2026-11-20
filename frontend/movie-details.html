@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Movie Details</title>
+
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+<div class="app-container">
+    <header>
+        <h1>CineMatch</h1>
+        <nav class="navbar">
+            <a href="index.html">Recommendation Generator</a>
+            <a href="search.html">Search</a>
+            <a href="trending.html">Trending</a>
+            <a href="upcoming.html">Upcoming</a>
+            <a href="now-playing.html">Now Playing</a>
+            <a href="weather.html">Weather</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="movieDetailsSection">
+            <div id="movieDetails">Loading movie details...</div>
+            <button id="backButton" type="button">← Back</button>
+        </section>
+    </main>
+</div>
+
+
+<script>
+    const detailsContainer = document.getElementById("movieDetails");
+
+    const params = new URLSearchParams(window.location.search);
+    const movieId = params.get("id");
+
+    const API_BASE_URL = "https://u9qh08ggii.execute-api.us-east-2.amazonaws.com/prod";
+    const DETAILS_URL = `${API_BASE_URL}/movie-details?movie_id=${movieId}`;
+
+    const backButton = document.getElementById("backButton");
+
+    backButton.addEventListener("click", () => {
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            window.location.href = "index.html";
+        }
+    });
+
+    async function loadMovieDetails() {
+        if (!movieId) {
+            detailsContainer.innerHTML = "<p>No movie ID provided.</p>";
+            return;
+        }
+
+        try {
+            const response = await fetch(DETAILS_URL);
+
+            if (!response.ok) {
+                throw new Error("Failed to load movie details");
+            }
+
+            const movie = await response.json();
+
+            const posterUrl = movie.poster_path
+                ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+                : "";
+
+            detailsContainer.innerHTML = `
+                <div class="movie-details-card">
+                    ${posterUrl ? `<img src="${posterUrl}" alt="${movie.title}">` : ""} 
+
+                    <div class="movie-metadata">
+                    <h2>${movie.title || "Untitled"} 
+                        <span class="movie-year">
+                            ${movie.release_date.slice(0, 4) || "N/A"}
+                        </span>
+                    </h2>
+
+                    <p>${movie.overview || "No overview available."}</p>
+
+                    <div class="meta-extras">
+                    <p><strong>Genres: </strong>${
+                movie.genres ? movie.genres.map(g => g.name).join(", ") : "N/A"
+            }</p>
+                    <p><strong>TMDB Rating: </strong>${movie.vote_average.toFixed(1) || "N/A"}  / 10 ★</p>
+                    <p><strong>Runtime: </strong>${movie.runtime ? movie.runtime + " mins" : "N/A"}</p>
+                    </div>
+
+                    </div>
+                </div>
+            `;
+        } catch (error) {
+            console.error(error);
+            detailsContainer.innerHTML = "<p>Failed to load movie details.</p>";
+        }
+    }
+
+    loadMovieDetails();
+</script>
+</body>
+</html>

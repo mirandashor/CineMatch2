@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>CineMatch</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+<div class="app-container">
+    <header>
+        <h1>CineMatch</h1>
+        <nav class="navbar">
+            <a href="index.html">Recommendation Generator</a>
+            <a href="search.html">Search</a>
+            <a href="trending.html">Trending</a>
+            <a href="upcoming.html">Upcoming</a>
+            <a href="now-playing.html">Now Playing</a>
+            <a href="weather.html">Weather</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="recommendationSection">
+            <form id="recommendationForm">
+                <h2>Recommendation Generator</h2>
+                <textarea id="promptInput" placeholder="Enter your prompt here..." required></textarea>
+                <div>
+                    <button type="submit" id="submitButton">Get Recommendations</button>
+                </div>
+            </form>
+            <div id="statusMessage"></div>
+        </section>
+
+        <section id="how">
+            <details>
+                <summary>How it works</summary>
+                <p>
+                    Enter a prompt to get a list of recommended movies tailored to your request! <br><br>
+                    The prompt can include keywords, genres, and overall moods, along with movie details
+                    like year of release and directors.
+                </p>
+                <p>Prompt <strong>MUST</strong> have a reference movie.</p>
+                <p>Example prompts:</p>
+                <ul>
+                    <li>Comedy action similar to spider-man (2002)</li>
+                    <li>Space movies like interstellar by christopher nolan</li>
+                    <li>Funny movies that feel like knives out</li>
+                    <li>Magic heist movies like now you see me (2013)</li>
+                </ul>
+            </details>
+        </section>
+
+        <section id="resultsSection">
+            <div class="results-header">
+                <h2>Recommended Movies</h2>
+            </div>
+            <div id="resultsContainer" class="results-grid"></div>
+            <div id="emptyState" class="empty-state">No recommendations yet. Submit a prompt to see results.</div>
+
+        </section>
+    </main>
+</div>
+
+
+<script>
+    const form = document.getElementById("recommendationForm");
+    const promptInput = document.getElementById("promptInput");
+    const submitButton = document.getElementById("submitButton");
+    const statusMessage = document.getElementById("statusMessage");
+    const resultsContainer = document.getElementById("resultsContainer");
+    const emptyState = document.getElementById("emptyState");
+
+    const WEBHOOK_URL = "https://aaronnnnnnnnnn.app.n8n.cloud/webhook/cinematch-recommend";
+
+    function renderMovies(movies, container, emptyMessage = "No movies found.") {
+        container.innerHTML = "";
+
+        if (!movies || movies.length === 0) {
+            container.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+            return;
+        }
+
+        for (const movie of movies) {
+            const posterUrl = movie.poster_url
+                ? movie.poster_url
+                : (movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : "");
+
+            const card = document.createElement("div");
+            card.className = "movie-card";
+
+            card.innerHTML = `
+                ${posterUrl ? `<img src="${posterUrl}" alt="${movie.title}">` : ""}
+                <h3>${movie.title || "Untitled"}</h3>
+                <p>${movie.release_date ? movie.release_date.slice(0, 4) : ""}</p>
+            `;
+
+            if (movie.id) {
+                card.style.cursor = "pointer";
+                card.addEventListener("click", () => {
+                    window.location.href = `movie-details.html?id=${movie.id}`;
+                });
+            }
+
+            container.appendChild(card);
+        }
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        document.getElementById("how").style.display = "none";
+
+        const prompt = promptInput.value.trim();
+        if (!prompt) return;
+
+        submitButton.disabled = true;
+        statusMessage.textContent = "Getting recommendations...";
+        resultsContainer.innerHTML = "";
+        emptyState.style.display = "none";
+
+        try {
+            const response = await fetch(WEBHOOK_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ prompt })
+            });
+
+            const text = await response.text();
+            console.log("Status:", response.status);
+            console.log("Raw response body:", text);
+
+            if (!response.ok) {
+                throw new Error(`Webhook failed: ${response.status} - ${text}`);
+            }
+
+            const data = text ? JSON.parse(text) : {};
+            console.log("Success data:", data);
+
+            const movies = Array.isArray(data) ? data : (data.movies || data.candidates || []);
+            renderMovies(movies, resultsContainer, "No recommendations found.");
+            statusMessage.textContent = "Recommendations loaded.";
+        } catch (error) {
+            console.error("Detailed webhook error:", error);
+            statusMessage.textContent = "Something went wrong.";
+            emptyState.style.display = "block";
+            emptyState.textContent = "Failed to load recommendations.";
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+</script>
+
+</body>
+
+</html>

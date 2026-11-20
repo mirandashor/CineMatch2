@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>CineMatch - Search</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+<div class="app-container">
+    <header>
+        <h1>CineMatch</h1>
+        <nav class="navbar">
+            <a href="index.html">Recommendation Generator</a>
+            <a href="search.html">Search</a>
+            <a href="trending.html">Trending</a>
+            <a href="upcoming.html">Upcoming</a>
+            <a href="now-playing.html">Now Playing</a>
+            <a href="weather.html">Weather</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="searchSection">
+            <form id="searchForm">
+                <h2>Search Movies</h2>
+                <textarea id="searchInput" rows="1" placeholder="Enter a movie title..." required></textarea>
+                <div>
+                    <button type="submit" id="searchButton">Search</button>
+                </div>
+            </form>
+
+            <div id="statusMessage"></div>
+        </section>
+
+        <section id="resultsSection">
+            <div class="results-header">
+                <h2>Search Results</h2>
+            </div>
+
+            <div id="resultsContainer" class="results-grid"></div>
+            <div id="emptyState" class="empty-state" style="display:none;"></div>
+        </section>
+    </main>
+</div>
+
+<script>
+    const API_BASE_URL = "https://u9qh08ggii.execute-api.us-east-2.amazonaws.com/prod";
+    const SEARCH_URL = `${API_BASE_URL}/search-movie`;
+
+    const form = document.getElementById("searchForm");
+    const searchInput = document.getElementById("searchInput");
+    const searchButton = document.getElementById("searchButton");
+    const statusMessage = document.getElementById("statusMessage");
+    const resultsContainer = document.getElementById("resultsContainer");
+    const emptyState = document.getElementById("emptyState");
+
+    function renderMovies(movies) {
+        resultsContainer.innerHTML = "";
+
+        if (!movies || movies.length === 0) {
+            emptyState.style.display = "block";
+            emptyState.textContent = "No results found.";
+            return;
+        }
+
+        emptyState.style.display = "none";
+
+        for (const movie of movies) {
+            const posterUrl = movie.poster_url
+                ? movie.poster_url
+                : (movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : "");
+
+            const card = document.createElement("div");
+            card.className = "movie-card";
+
+            card.innerHTML = `
+                    ${posterUrl ? `<img src="${posterUrl}" alt="${movie.title}">` : ""}
+                    <h3>${movie.title || "Untitled"}</h3>
+                    <p>${movie.release_date ? movie.release_date.slice(0, 4) : ""}</p>
+                `;
+
+            if (movie.id) {
+                card.style.cursor = "pointer";
+                card.addEventListener("click", () => {
+                    window.location.href = `movie-details.html?id=${movie.id}`;
+                });
+            }
+
+            resultsContainer.appendChild(card);
+        }
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const query = searchInput.value.trim();
+        if (!query) return;
+
+        searchButton.disabled = true;
+        statusMessage.textContent = "Searching...";
+        resultsContainer.innerHTML = "";
+        emptyState.style.display = "none";
+
+        try {
+            const response = await fetch(`${SEARCH_URL}?query=${encodeURIComponent(query)}`);
+
+            if (!response.ok) {
+                throw new Error("Search request failed");
+            }
+
+            const data = await response.json();
+            const movies = data.results || [];
+
+            renderMovies(movies);
+            statusMessage.textContent = "Results loaded.";
+        } catch (error) {
+            console.error(error);
+            statusMessage.textContent = "Something went wrong.";
+            emptyState.style.display = "block";
+            emptyState.textContent = "Failed to load results.";
+        } finally {
+            searchButton.disabled = false;
+        }
+    });
+</script>
+</body>
+
+</html>

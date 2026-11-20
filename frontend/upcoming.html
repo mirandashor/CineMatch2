@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>CineMatch - Upcoming</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+<div class="app-container">
+    <header>
+        <h1>CineMatch</h1>
+        <nav class="navbar">
+            <a href="index.html">Recommendation Generator</a>
+            <a href="search.html">Search</a>
+            <a href="trending.html">Trending</a>
+            <a href="upcoming.html">Upcoming</a>
+            <a href="now-playing.html">Now Playing</a>
+            <a href="weather.html">Weather</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="upcomingSection">
+            <div class="results-header">
+                <h2>Upcoming Movies</h2>
+            </div>
+
+            <div id="statusMessage"></div>
+            <div id="resultsContainer" class="results-grid"></div>
+            <div id="emptyState" class="empty-state" style="display: none;"></div>
+        </section>
+    </main>
+</div>
+
+<script>
+    const API_BASE_URL = "https://u9qh08ggii.execute-api.us-east-2.amazonaws.com/prod";
+    const UPCOMING_URL = `${API_BASE_URL}/upcoming-movies`;
+
+    const statusMessage = document.getElementById("statusMessage");
+    const resultsContainer = document.getElementById("resultsContainer");
+    const emptyState = document.getElementById("emptyState");
+
+    function renderMovies(movies) {
+        resultsContainer.innerHTML = "";
+
+        if (!movies || movies.length === 0) {
+            emptyState.style.display = "block";
+            emptyState.textContent = "No upcoming movies found.";
+            return;
+        }
+
+        emptyState.style.display = "none";
+
+        for (const movie of movies) {
+            const posterUrl = movie.poster_url
+                ? movie.poster_url
+                : (movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : "");
+
+            const card = document.createElement("div");
+            card.className = "movie-card";
+
+            card.innerHTML = `
+                    ${posterUrl ? `<img src="${posterUrl}" alt="${movie.title}">` : ""}
+                    <h3>${movie.title || "Untitled"}</h3>
+                    <p>${movie.release_date ? movie.release_date.slice(0, 4) : ""}</p>
+                `;
+
+            if (movie.id) {
+                card.style.cursor = "pointer";
+                card.addEventListener("click", () => {
+                    window.location.href = `movie-details.html?id=${movie.id}`;
+                });
+            }
+
+            resultsContainer.appendChild(card);
+        }
+    }
+
+    async function loadUpcomingMovies() {
+        statusMessage.textContent = "Loading upcoming movies...";
+        resultsContainer.innerHTML = "";
+        emptyState.style.display = "none";
+
+        try {
+            const response = await fetch(UPCOMING_URL);
+
+            if (!response.ok) {
+                throw new Error("Upcoming request failed");
+            }
+
+            const data = await response.json();
+            const movies = Array.isArray(data) ? data : (data.results || data.movies || []);
+            renderMovies(movies);
+            statusMessage.textContent = "";
+        } catch (error) {
+            console.error(error);
+            statusMessage.textContent = "Something went wrong.";
+            emptyState.style.display = "block";
+            emptyState.textContent = "Failed to load upcoming movies.";
+        }
+    }
+
+    loadUpcomingMovies();
+</script>
+</body>
+
+</html>
