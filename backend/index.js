@@ -31,7 +31,8 @@ app.listen(PORT, () => {
     console.log(`server is running on port ${PORT}`);
 });
 
-// search movie endpoint
+
+// GET search movie endpoint
 //endpoint routes. get endpoint with parameters (req) and output (res).
 // get query parameters from url
 app.get("/search-movie", async (req, res) => {
@@ -50,7 +51,7 @@ app.get("/search-movie", async (req, res) => {
     res.json(data);
 });
 
-// movie details endpoint
+// GET movie details endpoint
 app.get("/movie-details", async (req, res) => {
     const movie_id = req.query.movie_id;
 
@@ -64,5 +65,105 @@ app.get("/movie-details", async (req, res) => {
     res.json(data);
 });
 
+// GET keywords endpoint
+app.get("/keywords", async (req, res) => {
+    const movie_id = req.query.movie_id;
 
+    if (!movie_id) {
+        return res.staus(400).json ( {
+            error:"movie id is required"
+        });
+    }
+    const url = `https://api.themoviedb.org/3/movie/${movie_id}/keywords?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+// GET genre list endpoint
+app.get("/genre-list", async (req, res) => {
+//no parameters so no need for const or if
+    const url = `https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+// GET movie recommendations endpoint
+app.get("/movie-recommendations", async (req, res) => {
+    const movie_id = req.query.movie_id;
+
+    if (!movie_id) {
+        return res.status(400).json({
+            error:"movie id is required"
+        });
+    }
+    const url = `https://api.themoviedb.org/3/movie/${movie_id}/recommendations?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+// GET similar movies endpoint
+app.get("/similar-movies", async (req, res) => {
+    const movie_id = req.query.movie_id;
+
+    if (!movie_id) {
+        return res.status(400).json({
+            error:"movie id is required"
+        });
+    }
+    const url = `https://api.themoviedb.org/3/movie/${movie_id}/similar?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+// GET discover endpoint for recc
+app.get("/discover", async (req, res) => {
+    //create empty collection to hold parameters that we might add to url
+    const params = new URLSearchParams();
+    //add parameter and its value (.set) to empty container (params). (prameter name for TMDB, API key)
+    params.set("api_key", apiKey);
+
+    //check if the frontend gave any parameter, add to the url if so for genre, keyword
+    if (req.query.with_genres) params.set("with_genres", req.query.with_genres);
+    if (req.query.with_keywords) params.set("with_keywords", req.query.with_keywords);
+    if (req.query.sort_by) params.set("sort_by", req.query.sort_by);
+
+    //params holds all + api key
+    const url = `https://api.themoviedb.org/3/discover/movie?${params.toString()}`;
+    const data = await fetchJson(url);
+    res.json(data);
+})
+
+// GET popular movies endpoint
+app.get("/popular-movies", async (req, res) => {
+
+    const url = `https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+// GET trending movies endpoint
+app.get("/trending-movies", async (req, res) => {
+    //optional time window value, OR default to day if none provided
+    const time_window = req.query.time_window || "day";
+
+    const url = `https://api.themoviedb.org/3/trending/movie/${time_window}?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+// GET now playing movies endpoint
+app.get("/now-playing-movies", async (req, res) => {
+
+    const url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+// GET upcoming movies endpoint
+app.get("/upcoming-movies", async (req, res) => {
+
+    const url = `https://api.themoviedb.org/3/movie/upcoming?api_key=${apiKey}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
 
