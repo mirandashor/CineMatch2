@@ -1,3 +1,4 @@
+
 export const handler = async (event) => {
     const apiKey = process.env.TMDB_API_KEY;
     const weatherKey = process.env.WEATHER_API_KEY;
