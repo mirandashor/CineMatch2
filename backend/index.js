@@ -259,7 +259,108 @@ app.get("/smart-recommendations", async (req, res) => {
     const recData = await fetchJson(recUrl);
 
 
-});
+// 7. combine similar and recommended movie list into the existing movie array. add on their source as well
+    //push the similar data results into movies array, map goes through the array and transforms each item to have the source type
+    //...movie copies all properties from original movie
+    //source_type adds new identifying property where it came from
+    movies.push(...(similarData.results || []).map(movie => ({
+        ...movie,
+        source_type: "similar"
+    })));
 
+    movies.push(...(recData.results || []).map(movie => ({
+        ...movie,
+        source_type: "recommendation"
+    })));
+    //.push() = adds items to an existing array.
+    // .map() = goes through an array and transforms each item.
+    // ...movie = copies all properties from an existing object.
+
+
+// 8. Get requested genres, turn it into an array so it can be used to filter movies
+    // genresRaw holds user input. want to separate genres by commas, remove extra spaces, make it all lowercase, & remove empty entries
+    const requestedGenres = genresRaw
+        //split string into array whenever a comma is found
+        .split(",")
+        //go theough each genre (g) and remove extra spaces and convert to lowercase
+        .map(g => g.trim().toLowerCase())
+        //remove empty entries from array
+        .filter(Boolean);
+
+    // convert genre names to IDs
+    const requestedGenreIds = requestedGenres
+        //go through each genre in requestedGenres, look up genre (g) in genreMap, return its ID
+        .map(g => genreMap[g])
+        //remove anything without matching ID
+        .filter(id => id !== undefined);
+
+    // remove duplicates
+    //creating a pair for each movie by id, movie
+    // e.g. [597, { id: 597, title: "Titanic" }]
+    //new map using those pairs, but each entry must be unique. if an ID appears twice, it doesnt count it twice
+    //.values gets the movie objects without their id's as separate keys
+    //array is needed because of later methods like filtering. the list gets converted to an array
+    let uniqueMovies = Array.from(
+        new Map(movies.map(movie => [movie.id, movie])).values()
+    );
+
+    // filter movies that dont meet the requirements
+    //.filter looks at each movie, check if has title, release date, > 100 votes, popularity > 5, keep only if all conditions true
+    //movie.property accesses property from the current movie object
+    let filteredMovies = uniqueMovies.filter(movie =>
+        movie.title &&
+        movie.release_date &&
+        movie.vote_count >= 100 &&
+        movie.popularity >= 5
+    );
+
+    //filter movies by requested genres
+    //check if there are any genres, if empty, skip
+    //go through each movie in list and decide to keep or not
+    //.some check whether at least one item in an array meets a condition
+    //movie.genre_ids is the array of genre IDs for the current movie, .includes checks whether that array contains the requested ID, ? is optional chaining, prevents error if array is missing/unidentified
+    if (requestedGenresId.length > 0) {
+        filteredMovies = filteredMovies.filter(movie =>
+        requestedGenresId.some(id => movie.genre_ids?.includess(id))
+        );
+    }
+
+
+// 9. Fallback if the filtered pool is too small for 10 best movies
+    //get genre ids from the original user inputted movie
+    const referenceGenreIds = (detailsData.genres || []).map(g => g.id);
+    //decide what genres discover should use (if else) if there is user input use that, otherwise use original movie genre
+    const discoverGenreIds = requestedGenreIds.length > 0 ? requestedGenreIds : referenceGenreIds;
+
+    //decide if we need more movies or not. if the number of filtered movies is less than 10, we need to get more & a genre provided
+    if (filteredMovies.length < count && discoverGenreIds.length > 0) {
+        await delay(150);
+    }
+
+    //discover endpoint for new movies
+    //create empty container to hold URL parameters
+    //set api key, genres (using array format), sorting highest to lowest popularity, and choose first page of results
+    const discoverParams = new URLSearchParams();
+    discoverParams.set("api_key", apiKey);
+    discoverParams.set("with_genres", discoverGenreIds.join(","));
+    discoverParams.set("sort_by", "popularity.desc");
+    discoverParams.set("page", "1");
+
+    //build the request url using .toString to attach object data into the url as regular test
+    //store the results in discoverData
+    const discoverUrl = `https://api.themoviedb.org/3/discover/movie?${discoverParams.toString()}`;
+    const discoverData = await fetchJson(discoverUrl);
+
+    //add the new discovered movies into our existing movies array
+    //get array of movies returned by TMDB (results). go through every move and crate new version of it(.map)
+    //copy all existing info from the movie (...map). add new property to identify that it is from discover (source type)
+    movies.push(...(discoverData.results || []).map(movie => ({
+        ...movie,
+        source_type: "discover"
+    })));
+
+
+
+});
 
 
