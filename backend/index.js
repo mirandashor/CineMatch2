@@ -1,12 +1,15 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 // npm init -y
 // npm install dotenv
 // npm install express
+//npm install cors
 
 dotenv.config(); //read file for keys
 const app = express();
 const PORT = 5000;
+app.use(cors());
 
 //api keys, process = access from .env file
 const apiKey = process.env.TMDB_API_KEY;
