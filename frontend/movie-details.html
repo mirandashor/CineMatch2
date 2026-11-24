@@ -36,7 +36,7 @@
     const params = new URLSearchParams(window.location.search);
     const movieId = params.get("id");
 
-    const API_BASE_URL = "https://u9qh08ggii.execute-api.us-east-2.amazonaws.com/prod";
+    const API_BASE_URL = 'https://cinematch2-backend.onrender.com';
     const DETAILS_URL = `${API_BASE_URL}/movie-details?movie_id=${movieId}`;
 
     const backButton = document.getElementById("backButton");
