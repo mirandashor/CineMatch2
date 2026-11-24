@@ -112,6 +112,26 @@
         document.getElementById("how").style.display = "none";
 
         const prompt = promptInput.value.trim();
+        //temp genre and filler word fix while no AI
+        const genreNames = [
+            "action", "adventure", "animation", "comedy", "crime",
+            "documentary", "drama", "family", "fantasy", "history",
+            "horror", "music", "mystery", "romance", "science fiction",
+            "tv movie", "thriller", "war", "western"
+        ];
+
+        const lowerPrompt = prompt.toLowerCase();
+
+        const requestedGenres = genreNames.filter(genre =>
+            new RegExp(`\\b${genre}\\b`).test(lowerPrompt)
+        );
+
+        const movieTitle = prompt
+            .replace(/\bmovies?\b/gi, "")
+            .replace(/\blike\b|\bsimilar to\b|\bsuch as\b/gi, "")
+            .replace(new RegExp(`\\b(${requestedGenres.join("|")})\\b`, "gi"), "")
+            .trim();
+
         if (!prompt) return;
 
         submitButton.disabled = true;
@@ -120,8 +140,13 @@
         emptyState.style.display = "none";
 
         try {
+            const params = new URLSearchParams({
+                movieTitle: movieTitle,
+                genres: requestedGenres.join(",")
+            });
+
             const response = await fetch(
-                `${API_BASE_URL}/smart-recommendations?movieTitle=${encodeURIComponent(prompt)}`
+                `${API_BASE_URL}/smart-recommendations?${params.toString()}`
             );
 
             const text = await response.text();
