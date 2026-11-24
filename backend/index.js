@@ -29,10 +29,27 @@ app.get("/", (req, res) => {
     res.send("cinematch backend is running");
 });
 
-//start server on port, print confirmation
-app.listen(PORT, () => {
-    console.log(`server is running on port ${PORT}`);
-});
+const genreMap = {
+    action: 28,
+    adventure: 12,
+    animation: 16,
+    comedy: 35,
+    crime: 80,
+    documentary: 99,
+    drama: 18,
+    family: 10751,
+    fantasy: 14,
+    history: 36,
+    horror: 27,
+    music: 10402,
+    mystery: 9648,
+    romance: 10749,
+    "science fiction": 878,
+    "tv movie": 10770,
+    thriller: 53,
+    war: 10752,
+    western: 37
+};
 
 
 // GET search movie endpoint
@@ -73,7 +90,7 @@ app.get("/keywords", async (req, res) => {
     const movie_id = req.query.movie_id;
 
     if (!movie_id) {
-        return res.staus(400).json ( {
+        return res.status(400).json ( {
             error:"movie id is required"
         });
     }
@@ -134,7 +151,7 @@ app.get("/discover", async (req, res) => {
     const url = `https://api.themoviedb.org/3/discover/movie?${params.toString()}`;
     const data = await fetchJson(url);
     res.json(data);
-})
+});
 
 // GET popular movies endpoint
 app.get("/popular-movies", async (req, res) => {
@@ -170,6 +187,37 @@ app.get("/upcoming-movies", async (req, res) => {
     res.json(data);
 });
 
+// GET weather endpoints
+app.get("/current-weather", async (req, res) => {
+    const zip = req.query.zip;
+    const city = req.query.city;
+    const location = zip || city;
+
+    if (!location) {
+        return res.status(400).json ({
+            error: "zip or city is required"
+    });
+    }
+
+    const url = `https://api.weatherapi.com/v1/current.json?key=${weatherApiKey}&q=${encodeURIComponent(location)}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
+
+app.get("/weather-forecast", async (req, res) => {
+    const zip = req.query.zip;
+    const city = req.query.city;
+    const days = req.query.days || 7;
+    const location = zip || city;
+    if (!location) {
+        return res.status(400).json ({
+            error: "zip or city is required"
+        });
+    }
+    const url = `https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${encodeURIComponent(location)}&days=${days}`;
+    const data = await fetchJson(url);
+    res.json(data);
+});
 
 
 // *** movie recommendation generator endpoint ***
@@ -178,7 +226,7 @@ app.get("/smart-recommendations", async (req, res) => {
     // get info from the frontend user input (url with parameters (titles, genres))
     // e.g. /smart-recommendations?movieTitle=Titanic&genres=drama,romance&mood=sad
     const movieTitle = req.query.movieTitle || "";
-    const genres = req.query.genres || "";
+    const genresRaw = req.query.genres || "";
     const mood = req.query.mood || "";
     // get requested number of recs, default to 10, convert text to whole number, never exceed 30
     const count = Math.min(parseInt(req.query.count || "10", 10), 30);
@@ -189,7 +237,7 @@ app.get("/smart-recommendations", async (req, res) => {
     //make sure the user provided a movie title, error if not
     if (!movieTitle) {
         return res.status(400).json({
-            error:"movie title is required"
+            error: "movie title is required"
         });
     }
 
@@ -200,7 +248,7 @@ app.get("/smart-recommendations", async (req, res) => {
     const searchData = await fetchJson(searchUrl);
 
     if (!searchData.results || searchData.results.length === 0) {
-        return res.status(400).json ({
+        return res.status(400).json({
             error: "no movie found"
         });
     }
@@ -210,7 +258,7 @@ app.get("/smart-recommendations", async (req, res) => {
     //get the id from the first movie with .id
     const movieId = firstMovie.id;
 
-    await delay (150);
+    await delay(150);
 
 
 // 2. Movie details
@@ -319,9 +367,9 @@ app.get("/smart-recommendations", async (req, res) => {
     //go through each movie in list and decide to keep or not
     //.some check whether at least one item in an array meets a condition
     //movie.genre_ids is the array of genre IDs for the current movie, .includes checks whether that array contains the requested ID, ? is optional chaining, prevents error if array is missing/unidentified
-    if (requestedGenresId.length > 0) {
+    if (requestedGenreIds.length > 0) {
         filteredMovies = filteredMovies.filter(movie =>
-        requestedGenresId.some(id => movie.genre_ids?.includess(id))
+            requestedGenreIds.some(id => movie.genre_ids?.includes(id))
         );
     }
 
@@ -335,32 +383,150 @@ app.get("/smart-recommendations", async (req, res) => {
     //decide if we need more movies or not. if the number of filtered movies is less than 10, we need to get more & a genre provided
     if (filteredMovies.length < count && discoverGenreIds.length > 0) {
         await delay(150);
+
+        //discover endpoint for new movies
+        //create empty container to hold URL parameters
+        //set api key, genres (using array format), sorting highest to lowest popularity, and choose first page of results
+        const discoverParams = new URLSearchParams();
+        discoverParams.set("api_key", apiKey);
+        discoverParams.set("with_genres", discoverGenreIds.join(","));
+        discoverParams.set("sort_by", "popularity.desc");
+        discoverParams.set("page", "1");
+
+        //build the request url using .toString to attach object data into the url as regular test
+        //store the results in discoverData
+        const discoverUrl = `https://api.themoviedb.org/3/discover/movie?${discoverParams.toString()}`;
+        const discoverData = await fetchJson(discoverUrl);
+
+        //add the new discovered movies into our existing movies array
+        //get array of movies returned by TMDB (results). go through every move and crate new version of it(.map)
+        //copy all existing info from the movie (...map). add new property to identify that it is from discover (source type)
+        movies.push(...(discoverData.results || []).map(movie => ({
+            ...movie,
+            source_type: "discover"
+        })));
+
+        //remove duplicate movies from discover search (same as similar)
+        uniqueMovies = Array.from(
+            new Map(movies.map(movie => [movie.id, movie])).values()
+        );
+
+        filteredMovies = uniqueMovies.filter(movie =>
+            movie.title &&
+            movie.release_date &&
+            movie.vote_count >= 100 &&
+            movie.popularity >= 5
+        );
+
+        if (requestedGenreIds.length > 0) {
+            filteredMovies = filteredMovies.filter(movie =>
+                requestedGenreIds.some(id => movie.genre_ids?.includes(id))
+            );
+        }
     }
 
-    //discover endpoint for new movies
-    //create empty container to hold URL parameters
-    //set api key, genres (using array format), sorting highest to lowest popularity, and choose first page of results
-    const discoverParams = new URLSearchParams();
-    discoverParams.set("api_key", apiKey);
-    discoverParams.set("with_genres", discoverGenreIds.join(","));
-    discoverParams.set("sort_by", "popularity.desc");
-    discoverParams.set("page", "1");
+    // fallback 1: relax filter if too few remain
+    if (filteredMovies.length < count) {
+        filteredMovies = uniqueMovies.filter(movie =>
+            movie.title &&
+            movie.release_date &&
+            movie.vote_count >= 20
+        );
 
-    //build the request url using .toString to attach object data into the url as regular test
-    //store the results in discoverData
-    const discoverUrl = `https://api.themoviedb.org/3/discover/movie?${discoverParams.toString()}`;
-    const discoverData = await fetchJson(discoverUrl);
+        if (requestedGenreIds.length > 0) {
+            filteredMovies = filteredMovies.filter(movie =>
+                requestedGenreIds.some(id => movie.genre_ids?.includes(id))
+            );
+        }
+    }
 
-    //add the new discovered movies into our existing movies array
-    //get array of movies returned by TMDB (results). go through every move and crate new version of it(.map)
-    //copy all existing info from the movie (...map). add new property to identify that it is from discover (source type)
-    movies.push(...(discoverData.results || []).map(movie => ({
-        ...movie,
-        source_type: "discover"
-    })));
+    // fallback 2: if still too few, just keep valid movies
+    if (filteredMovies.length < count) {
+        filteredMovies = uniqueMovies.filter(movie =>
+            movie.title &&
+            movie.release_date
+        );
+        if (requestedGenreIds.length > 0) {
+            filteredMovies = filteredMovies.filter(movie =>
+                requestedGenreIds.some(id => movie.genre_ids?.includes(id))
+            );
+        }
+    }
 
+// 10. Sorting order of recommendations. similar/recommendation first, discover last
+    //assign each source a priority number
+    const sourcePriority = {
+        similar: 0,
+        recommendation: 1,
+        discover: 2
+    };
 
+    //sort the movies
+    //rearrange array by comparing 2 movies at a time
+    //get each movies priority in our sourcePriority object. unknown priority gets assigned 99 and pushed to the end
+    filteredMovies.sort((a, b) => {
+        const aPriority = sourcePriority[a.source_type] ?? 99;
+        const bPriority = sourcePriority[b.source_type] ?? 99;
 
+        //compare the two priority numbers to choose which is first by subtraction and whichever is higher
+        if (aPriority !== bPriority) {
+            return aPriority - bPriority;
+        }
+
+        //if they have the same priority, sort by their scores
+        //use movies average rating and how many people rated it to favor the higher ones
+        const scoreA = (a.vote_average || 0) * Math.log((a.vote_count || 0) + 1);
+        const scoreB = (b.vote_average || 0) * Math.log((b.vote_count || 0) + 1);
+
+        //return movie with highest score first
+        return scoreB - scoreA;
+    });
+
+    //get the original movies keywords
+    const referenceKeywords = (keywordsData.keywords || []).map(k => k.name);
+
+    //clean up the candidate movies and only keep the information that we want in an array (cleaned)
+    // only take 30 best movies max to further narrow down to 10
+    //id, title, overview, poster, release date, genre id (convert to names), rating, popularity
+    const cleaned = filteredMovies.slice(0, 30).map(movie => ({
+        id: movie.id,
+        title: movie.title,
+        overview: movie.overview,
+        poster_path: movie.poster_path,
+        release_date: movie.release_date,
+        genre_ids: movie.genre_ids || [],
+        genres: (movie.genre_ids || []).map(id => genreIdToName[id]).filter(Boolean),
+        vote_average: movie.vote_average || 0,
+        vote_count: movie.vote_count || 0,
+        popularity: movie.popularity || 0
+    }));
+
+    //return the final response
+    //info about the original movie the user searched for
+    //the info the user originally submitted
+    //the list of cleaned up candidates
+    return res.json({
+        reference_movie: {
+            id: detailsData.id,
+            title: detailsData.title,
+            overview: detailsData.overview || "",
+            genres: (detailsData.genres || []).map(g => g.name),
+            genre_ids: (detailsData.genres || []).map(g => g.id),
+            keywords: referenceKeywords,
+            release_date: detailsData.release_date || ""
+        },
+        user_request: {
+            movieTitle,
+            genres: requestedGenres,
+            mood,
+            count
+        },
+        candidates: cleaned
+    });
 });
 
+// start server on port, print confirmation
+app.listen(PORT, () => {
+    console.log(`server is running on port ${PORT}`);
+});
 
