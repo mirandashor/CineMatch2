@@ -71,7 +71,7 @@
     const resultsContainer = document.getElementById("resultsContainer");
     const emptyState = document.getElementById("emptyState");
 
-    const WEBHOOK_URL = "https://aaronnnnnnnnnn.app.n8n.cloud/webhook/cinematch-recommend";
+    const API_BASE_URL = "https://cinematch2-backend.onrender.com";
 
     function renderMovies(movies, container, emptyMessage = "No movies found.") {
         container.innerHTML = "";
@@ -120,13 +120,9 @@
         emptyState.style.display = "none";
 
         try {
-            const response = await fetch(WEBHOOK_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ prompt })
-            });
+            const response = await fetch(
+                `${API_BASE_URL}/smart-recommendations?movieTitle=${encodeURIComponent(prompt)}`
+            );
 
             const text = await response.text();
             console.log("Status:", response.status);
@@ -139,7 +135,7 @@
             const data = text ? JSON.parse(text) : {};
             console.log("Success data:", data);
 
-            const movies = Array.isArray(data) ? data : (data.movies || data.candidates || []);
+            const movies = data.candidates || [];
             renderMovies(movies, resultsContainer, "No recommendations found.");
             statusMessage.textContent = "Recommendations loaded.";
         } catch (error) {
